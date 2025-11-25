@@ -1,0 +1,53 @@
+import numpy as np
+import cv2
+from sklearn import svm
+from sklearn.metrics import classification_report, accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from skimage.transform import resize
+
+# Load uploaded images
+cat_img = cv2.imread("cat.jpg")
+dog_img = cv2.imread("dog.jpg")
+
+if cat_img is None or dog_img is None:
+    raise FileNotFoundError("❌ Cat or Dog image not found! Please upload them as cat.jpg and dog.jpg")
+
+# Convert & resize
+cat_img = cv2.cvtColor(cat_img, cv2.COLOR_BGR2RGB).astype("float32") / 255.0
+dog_img = cv2.cvtColor(dog_img, cv2.COLOR_BGR2RGB).astype("float32") / 255.0
+
+def make_variations(img, n=50, size=(64, 64)):
+    X = []
+    for _ in range(n):
+        angle = np.random.uniform(-20, 20)
+        M = cv2.getRotationMatrix2D((img.shape[1] // 2, img.shape[0] // 2), angle, 1)
+        rotated = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))
+        resized = resize(rotated, size, anti_aliasing=False)
+        X.append(resized.flatten())
+    return np.array(X)
+
+# Create dataset
+samples = 60
+cat_data = make_variations(cat_img, samples)
+dog_data = make_variations(dog_img, samples)
+
+X = np.vstack([cat_data, dog_data])
+y = np.array([0] * samples + [1] * samples)
+
+# Train/Test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+
+# Scale features
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# Train SVM
+model = svm.SVC(kernel="linear")
+model.fit(X_train, y_train)
+
+# Evaluate
+y_pred = model.predict(X_test)
+print("\nAccuracy:", accuracy_score(y_test, y_pred))
+print("\nClassification Report:\n", classification_report(y_test, y_pred))
